@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>去头去尾分</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #eef1f4; color: #1f2630; line-height: 1.6; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 20px 14px 40px; }
+  h1 { font-size: 26px; letter-spacing: 1px; }
+  .lead { color: #4f5a66; font-size: 14px; margin: 4px 0 14px; }
+  .card { background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #d3dae2; margin-bottom: 14px; min-width: 0; }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
+  label { font-size: 12px; color: #4f5a66; display: block; overflow-wrap: anywhere; }
+  input { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid #b6c0cb; border-radius: 6px; width: 100%; min-width: 0; background: #fff; font-variant-numeric: tabular-nums; }
+  .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 10px; margin-top: 8px; }
+  .grid > div { min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+  .grid .wide { grid-column: span 2; }
+  .bad { border-color: #b3362b !important; background: #fff0ed !important; }
+  button { font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 6px; border: 1px solid #2d5b8a; background: #2d5b8a; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #2d5b8a; }
+  button:disabled { opacity: .45; cursor: default; }
+  .presets, .dl { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .rows { margin-top: 10px; display: grid; gap: 6px; }
+  .rrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3.4fr) 40px; gap: 6px; align-items: center; }
+  .rrow button { padding: 5px 0; }
+  .rhead { font-size: 12px; color: #4f5a66; }
+  .err { display: none; background: #fff0ed; border: 1px solid #ecb4aa; color: #8e2318; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; overflow-wrap: anywhere; }
+  .muted { color: #6a7480; font-size: 12px; overflow-wrap: anywhere; }
+  .verdict { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .stamp { display: inline-block; border: 3px solid #2c7a4b; color: #2c7a4b; border-radius: 6px; padding: 0 10px; font-weight: 800; font-size: 20px; white-space: nowrap; transform: rotate(-3deg); }
+  .stamp.fragile { border-color: #b7791f; color: #b7791f; } .stamp.tie { border-color: #b3362b; color: #b3362b; }
+  #big { font-size: 15px; overflow-wrap: anywhere; min-width: 0; } #big b { font-size: 28px; font-variant-numeric: tabular-nums; }
+  #sumTxt { font-size: 15px; margin-top: 8px; overflow-wrap: anywhere; }
+  #facts { margin: 8px 0 0 18px; font-size: 13px; color: #34404c; } #facts li { margin: 3px 0; overflow-wrap: anywhere; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .sheet { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .sheet th, .sheet td { padding: 6px 7px; border-bottom: 1px solid #e3e8ee; text-align: center; white-space: nowrap; }
+  .sheet th { font-size: 12px; color: #4f5a66; font-weight: 600; }
+  .sheet td.nm { text-align: left; font-weight: 600; max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+  .sheet td.rk { font-weight: 700; color: #2d5b8a; }
+  .sheet td.cut { color: #a0a8b2; text-decoration: line-through; text-decoration-color: #b3362b; text-decoration-thickness: 2px; }
+  .sheet td.avg { font-weight: 700; font-size: 15px; background: #f3f7fb; }
+  .sheet td.raw { color: #6a7480; }
+  .sheet tr.top td { background: #fff7e6; } .sheet tr.top td.avg { background: #fdebc8; }
+  .rules td.now, .rules th.now { background: #eaf2fb; font-weight: 700; }
+  .rules td.chg { color: #b3362b; font-weight: 700; }
+  canvas { display: block; width: 100%; }
+  #ladder { height: 220px; }
+  #stepList { margin: 4px 0 0 18px; font-size: 13px; color: #34404c; } #stepList li { margin: 3px 0; overflow-wrap: anywhere; }
+  #sugs { display: grid; gap: 8px; }
+  .sug { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px dashed #b6c0cb; border-radius: 8px; padding: 8px 10px; }
+  .sug span { font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
+  .sug button { flex: none; }
+  .foot { font-size: 12px; color: #6a7480; margin-top: 10px; overflow-wrap: anywhere; }
+  @media (max-width: 640px) {
+    h1 { font-size: 22px; }
+    .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid .wide { grid-column: span 3; }
+    #big b { font-size: 24px; }
+    .rrow { grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) 34px; gap: 4px; }
+    .sheet { font-size: 13px; } .sheet th, .sheet td { padding: 5px 4px; }
+    #ladder { height: 200px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>去头去尾分</h1>
+  <p class="lead">比赛打分常用「去掉一个最高分、一个最低分，剩下取平均」。把评分表贴进来，算出名次，再看三件事：换一种去法名次变不变，任何一个分差一格冠军会不会换人，显示的位数会不会把不同的分显示成一样。</p>
+
+  <div class="card">
+    <h2>打分规则</h2>
+    <div class="grid">
+      <div class="wide"><label for="label">比赛名（可空）</label><input id="label" maxlength="40"></div>
+      <div><label for="min">最低分</label><input id="min" inputmode="decimal" maxlength="7"></div>
+      <div><label for="max">满分</label><input id="max" inputmode="decimal" maxlength="7"></div>
+      <div><label for="step">最小刻度</label><input id="step" inputmode="decimal" maxlength="7"></div>
+      <div><label for="D">平均分显示几位小数</label><input id="D" inputmode="numeric" maxlength="2"></div>
+      <div class="wide"><label for="k">最高、最低各去掉几个（0 = 直接平均）</label><input id="k" inputmode="numeric" maxlength="2"></div>
+    </div>
+    <h2 style="margin-top:14px">评分表（每行一位选手，分数按评委顺序，用空格或逗号隔开）</h2>
+    <div class="rrow rhead"><span>选手</span><span>各位评委的分</span><span></span></div>
+    <div class="rows" id="rows"></div>
+    <div class="presets"><button class="ghost" id="addRow">加一位选手</button></div>
+    <p class="muted" style="margin-top:8px">每位评委都要给每个人打分（3–15 位评委，2–12 位选手），分数最多 2 位小数。名次按留下的分加起来比，一样就并列；显示的平均分按四舍五入。本页不内置任何比赛的真实规则或成绩。</p>
+    <div class="presets" id="presets"></div>
+    <div class="presets"><button class="ghost" id="reset">恢复默认</button></div>
+  </div>
+
+  <div class="err" id="error"></div>
+
+  <div id="out">
+    <div class="card">
+      <div class="verdict"><span class="stamp" id="stamp"></span><div id="big"></div></div>
+      <p id="sumTxt"></p>
+      <ul id="facts"></ul>
+    </div>
+    <div class="card">
+      <h2>评分单：划掉的是去掉的分</h2>
+      <div class="scroll"><table class="sheet" id="sheet"></table></div>
+    </div>
+    <div class="card">
+      <h2>名次梯：留下的分平均（同一刻度，挨得多近一眼看出）</h2>
+      <canvas id="ladder"></canvas>
+    </div>
+    <div class="card">
+      <h2>换一种去法</h2>
+      <div class="scroll"><table class="sheet rules" id="rules"></table></div>
+      <p class="muted" style="margin-top:6px">红字 = 跟现在的名次不一样。最后一行：相邻两名里，有几对只靠一位评委（给后一位打满分、给前一位打最低分）就能翻过来。</p>
+    </div>
+    <div class="card">
+      <h2>差一格会怎样</h2>
+      <ul id="stepList"></ul>
+    </div>
+    <div class="card" id="sugCard">
+      <h2>可以试的（点「代回」直接改上面）</h2>
+      <div id="sugs"></div>
+    </div>
+    <div class="card">
+      <h2>拿走结果</h2>
+      <div class="dl" style="margin-top:0"><button id="dlPNG">结果卡 PNG</button><button class="ghost" id="dlCSV">评分表 CSV</button><button class="ghost" id="dlMD">Markdown</button><button class="ghost" id="dlJSON">JSON 备份</button></div>
+      <p class="foot">按「去掉最高 k 个、最低 k 个，剩下取平均」算；名次比留下的分之和，同分并列，不做加权、难度系数、评委打分一致性检验或同分再比的附加规则。分数都是你自己填的；默认数据为虚构示例。填的内容只存在本机浏览器。</p>
+    </div>
+  </div>
+</div>
+
+  <script>
+/* 去头去尾分 · 计算核心（纯函数，Node 与浏览器共用）
+ * 比赛常见的打分规则：几位评委各打一个分，去掉最高的 k 个、最低的 k 个，剩下的取平均。
+ * 本页把一张评分表按这个规则算一遍：名次、去掉了谁的哪几分、换一种去法名次会不会变、
+ * 第 2 名要追上第 1 名差在哪一分、任何一个分差一格名次会不会变、显示位数会不会把不同的分显示成一样。
+ * 精确性：分数最多 2 位小数，全程按「百分之一分」整数算；同一规则下人人去掉的个数相同，
+ * 名次直接比剩下的分之和（整数），没有浮点误差。显示的平均分按四舍五入到你选的位数。
+ * 分数全是你填的，本页不内置任何比赛的真实规则或成绩。 */
+(function (root) {
+  'use strict';
+  const KEYS = ['label', 'min', 'max', 'step', 'k', 'D', 'rows'];
+  const MAX_ROWS = 12, MIN_ROWS = 2, MAX_J = 15, MIN_J = 3, MAX_GRID = 10000;
+
+  class InputError extends Error { constructor(msg, field) { super(msg); this.field = field; } }
+
+  function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
+  /* 百分之一分整数 → 文本（去掉末尾 0） */
+  function sc(u) { const neg = u < 0, a = Math.abs(u), i = Math.floor(a / 100), f = a % 100; let t = String(i); if (f) t += '.' + String(f).padStart(2, '0').replace(/0$/, ''); return (neg ? '−' : '') + t; }
+  /* 有理数 num/den（num≥0）四舍五入到 D 位小数 → 文本 */
+  function rnd(num, den, D) {
+    const p = Math.pow(10, D), r = Math.floor((2 * num * p + den) / (2 * den));
+    const i = Math.floor(r / p), f = r % p;
+    return D ? i + '.' + String(f).padStart(D, '0') : String(i);
+  }
+  function num(s, field, label) {
+    const t = String(s == null ? '' : s).trim();
+    if (!t) throw new InputError(label + '没填', field);
+    if (!/^\d+(\.\d{1,2})?$/.test(t)) throw new InputError(label + '只能填不小于 0 的数，最多 2 位小数', field);
+    const [a, b = ''] = t.split('.');
+    const v = parseInt(a, 10) * 100 + parseInt((b + '00').slice(0, 2), 10);
+    if (v > 100000) throw new InputError(label + '最多 1000', field);
+    return v;
+  }
+  function splitScores(t) { return String(t == null ? '' : t).trim().split(/[\s,，、;；|]+/).filter(Boolean); }
+
+  function parse(s) {
+    if (!s || typeof s !== 'object') throw new InputError('数据坏了', 'rows');
+    const label = String(s.label == null ? '' : s.label);
+    if (label.length > 30) throw new InputError('比赛名最多 30 个字', 'label');
+    const min = num(s.min, 'min', '最低分'), max = num(s.max, 'max', '满分');
+    if (max <= min) throw new InputError('满分要比最低分大', 'max');
+    const step = num(s.step, 'step', '最小刻度');
+    if (step <= 0) throw new InputError('最小刻度要大于 0', 'step');
+    if ((max - min) % step) throw new InputError('满分减最低分要是最小刻度的整数倍', 'step');
+    if ((max - min) / step > MAX_GRID) throw new InputError('刻度太细：最低分到满分最多 ' + fmtInt(MAX_GRID) + ' 格', 'step');
+    const D = String(s.D == null ? '' : s.D).trim();
+    if (!/^[0-4]$/.test(D)) throw new InputError('显示位数只能是 0–4', 'D');
+    if (!Array.isArray(s.rows)) throw new InputError('评分表坏了', 'rows');
+    if (s.rows.length < MIN_ROWS) throw new InputError('至少要 ' + MIN_ROWS + ' 位选手', 'rows');
+    if (s.rows.length > MAX_ROWS) throw new InputError('最多 ' + MAX_ROWS + ' 位选手', 'rows');
+    const rows = [], seen = {};
+    let n = -1;
+    s.rows.forEach((r, i) => {
+      if (!r || typeof r !== 'object') throw new InputError('评分表坏了', 'rows');
+      const nm = String(r.name == null ? '' : r.name).trim() || '选手 ' + (i + 1);
+      if (nm.length > 12) throw new InputError('第 ' + (i + 1) + ' 位选手名字最多 12 个字', 'row-' + i + '-name');
+      if (seen[nm]) throw new InputError('选手名字「' + nm + '」重复了', 'row-' + i + '-name');
+      seen[nm] = 1;
+      const toks = splitScores(r.scores);
+      const f = 'row-' + i + '-scores';
+      if (!toks.length) throw new InputError(nm + ' 的分没填', f);
+      if (toks.length < MIN_J) throw new InputError(nm + ' 只有 ' + toks.length + ' 个分，至少要 ' + MIN_J + ' 位评委', f);
+      if (toks.length > MAX_J) throw new InputError(nm + ' 有 ' + toks.length + ' 个分，最多 ' + MAX_J + ' 位评委', f);
+      if (n < 0) n = toks.length;
+      else if (toks.length !== n) throw new InputError(nm + ' 有 ' + toks.length + ' 个分，别人是 ' + n + ' 个；每位评委都要给每个人打分', f);
+      const v = toks.map((t, j) => {
+        if (!/^\d+(\.\d{1,2})?$/.test(t)) throw new InputError(nm + ' 的第 ' + (j + 1) + ' 个分「' + t.slice(0, 8) + '」不是数（最多 2 位小数）', f);
+        const x = num(t, f, nm + ' 的第 ' + (j + 1) + ' 个分');
+        if (x < min || x > max) throw new InputError(nm + ' 的第 ' + (j + 1) + ' 个分 ' + t + ' 不在 ' + sc(min) + '–' + sc(max) + ' 之间', f);
+        return x;
+      });
+      rows.push({ name: nm, v });
+    });
+    const kt = String(s.k == null ? '' : s.k).trim();
+    if (!/^\d+$/.test(kt)) throw new InputError('去掉几个只能填整数', 'k');
+    const k = parseInt(kt, 10), kmax = Math.floor((n - 1) / 2);
+    if (k > kmax) throw new InputError(n + ' 位评委最多各去掉 ' + kmax + ' 个（至少要留 1 个分）', 'k');
+    return { label, min, max, step, D: +D, k, kmax, n, rows };
+  }
+
+  /* 去掉最高 k、最低 k 后的和；dropped 为被去掉的下标（同分时去掉靠后的评委，只影响划线位置，不影响和） */
+  function trim(v, k) {
+    const idx = v.map((x, j) => j).sort((a, b) => v[a] - v[b] || a - b);
+    const lo = idx.slice(0, k), hi = idx.slice(v.length - k);
+    let sum = 0; for (let t = k; t < v.length - k; t++) sum += v[idx[t]];
+    return { sum, lo, hi };
+  }
+  const tsum = (v, k) => trim(v, k).sum;
+  function ranksOf(sums) { return sums.map((x) => 1 + sums.filter((y) => y > x).length); }
+  function order(sums) { return sums.map((x, i) => i).sort((a, b) => sums[b] - sums[a] || a - b); }
+  function ruleName(k, n) { return k === 0 ? '直接平均' : n - 2 * k === 1 ? '只看中间那个' : '去 ' + k + ' 高 ' + k + ' 低'; }
+
+  /* 只改评委 j 给选手 b 的一个分（从当前往上，落在刻度上），让 b 剩下的和 > target（strict=true）或 ≥ target。
+   * 和对这一个分单调不减 → 二分。返回最小的分（百分之一分），做不到返回 -1。 */
+  function raiseTo(P, v, j, target, k, strict) {
+    const okAt = (x) => { const w = v.slice(); w[j] = x; const t = tsum(w, k); return strict ? t > target : t >= target; };
+    const cur = v[j];
+    if (okAt(cur)) return cur;
+    let lo = Math.floor((cur - P.min) / P.step) + 1, hi = (P.max - P.min) / P.step;
+    if (lo > hi || !okAt(P.min + hi * P.step)) return -1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (okAt(P.min + m * P.step)) hi = m; else lo = m + 1; }
+    return P.min + lo * P.step;
+  }
+  /* 第 b 位要超过第 a 位：所有评委里，单改一个分、加得最少的那个 */
+  function bestRaise(P, a, b, k) {
+    const ta = tsum(P.rows[a].v, k);
+    let best = null;
+    for (let j = 0; j < P.n; j++) {
+      const x = raiseTo(P, P.rows[b].v, j, ta, k, true);
+      if (x < 0) continue;
+      const d = x - P.rows[b].v[j];
+      if (!best || d < best.d) best = { j, x, d };
+    }
+    return best;
+  }
+  /* 一位评委一个人能不能把 b 排到 a 前面（给 b 打满分、给 a 打最低分） */
+  function judgeCanFlip(P, a, b, k, j) {
+    const va = P.rows[a].v.slice(), vb = P.rows[b].v.slice();
+    va[j] = P.min; vb[j] = P.max;
+    return tsum(vb, k) > tsum(va, k);
+  }
+  /* 相邻名次（和严格不同的相邻两人）里，有几对能被某一位评委单独翻过来 */
+  function flipPower(P, k) {
+    const sums = P.rows.map((r) => tsum(r.v, k)), od = order(sums), pairs = [];
+    for (let t = 0; t + 1 < od.length; t++) {
+      const a = od[t], b = od[t + 1];
+      if (sums[a] === sums[b]) continue;
+      const js = [];
+      for (let j = 0; j < P.n; j++) if (judgeCanFlip(P, a, b, k, j)) js.push(j);
+      pairs.push({ a, b, js });
+    }
+    return { pairs, n: pairs.filter((p) => p.js.length).length };
+  }
+  /* 差一格：任一个分 ±1 格（不出范围）后名次有没有变 */
+  function oneStep(P, k) {
+    const base = ranksOf(P.rows.map((r) => tsum(r.v, k)));
+    const all = [], hit = [];
+    P.rows.forEach((r, c) => {
+      for (let j = 0; j < P.n; j++) for (const dlt of [1, -1]) {
+        const x = r.v[j] + dlt * P.step;
+        if (x < P.min || x > P.max) continue;
+        const w = r.v.slice(); w[j] = x;
+        const sums = P.rows.map((rr, cc) => tsum(cc === c ? w : rr.v, k)), rk = ranksOf(sums);
+        all.push(1);
+        if (rk.some((q, i) => q !== base[i])) hit.push({ c, j, dlt, x, rk, champ: rk[c] === 1 || base[c] === 1 ? 1 : 0, changed: rk.map((q, i) => q !== base[i] ? i : -1).filter((i) => i >= 0) });
+      }
+    });
+    return { total: all.length, hit, base };
+  }
+
+  function calculate(s) {
+    const P = parse(s), k = P.k, c = P.n - 2 * k, D = P.D;
+    const tr = P.rows.map((r) => trim(r.v, k));
+    const sums = tr.map((t) => t.sum), raw = P.rows.map((r) => r.v.reduce((a, b) => a + b, 0));
+    const rk = ranksOf(sums), od = order(sums);
+    const show = sums.map((x) => rnd(x, 100 * c, D)), showRaw = raw.map((x) => rnd(x, 100 * P.n, D));
+    const rawRk = ranksOf(raw);
+    /* 各种去法并排 */
+    const rules = [];
+    for (let kk = 0; kk <= P.kmax; kk++) {
+      const ss = P.rows.map((r) => tsum(r.v, kk)), rr = ranksOf(ss), cc = P.n - 2 * kk;
+      rules.push({ k: kk, name: ruleName(kk, P.n), sums: ss, ranks: rr, show: ss.map((x) => rnd(x, 100 * cc, D)), champs: rr.map((q, i) => q === 1 ? i : -1).filter((i) => i >= 0), flip: flipPower(P, kk) });
+    }
+    const cur = rules[k];
+    const champs = cur.champs, nm = (i) => P.rows[i].name;
+    const step1 = oneStep(P, k);
+    const champHit = step1.hit.filter((h) => { const nc = h.rk.map((q, i) => q === 1 ? i : -1).filter((i) => i >= 0); return JSON.stringify(nc) !== JSON.stringify(champs); });
+    /* 显示一样、实际不同 */
+    const showTies = [];
+    for (let t = 0; t + 1 < od.length; t++) { const a = od[t], b = od[t + 1]; if (sums[a] !== sums[b] && show[a] === show[b]) showTies.push({ a, b }); }
+    /* 第 2 名追第 1 名 */
+    let chase = null;
+    if (champs.length === 1) {
+      const second = od.find((i) => sums[i] < sums[champs[0]]);
+      if (second != null) chase = { a: champs[0], b: second, gap: sums[champs[0]] - sums[second], best: bestRaise(P, champs[0], second, k) };
+    }
+    const st = champs.length > 1 ? 'tie' : champHit.length ? 'fragile' : 'ok';
+    const STAMP = { tie: '冠军并列', fragile: '差一格就换人', ok: '冠军稳' };
+    const rn = ruleName(k, P.n);
+    let summary;
+    if (st === 'tie') summary = '按「' + rn + '」，' + champs.map(nm).join('、') + ' 留下的分加起来完全一样，并列第一（' + show[champs[0]] + ' 分）。';
+    else {
+      const a = champs[0];
+      summary = '按「' + rn + '」，' + nm(a) + ' 第一（' + show[a] + ' 分）' + (chase ? '，比第 2 名 ' + nm(chase.b) + '（' + show[chase.b] + '），留下的 ' + c + ' 个分加起来多 ' + sc(chase.gap) + ' 分' : '') + '；' +
+        (champHit.length ? '只要有一个分差一格（' + sc(P.step) + '），冠军就可能换人或变成并列，这样的改法有 ' + champHit.length + ' 种。' : '任何一个分差一格（' + sc(P.step) + '），冠军都不变。');
+    }
+    const facts = [];
+    facts.push(P.rows.length + ' 位选手、' + P.n + ' 位评委，' + (k ? '每人去掉最高 ' + k + ' 个和最低 ' + k + ' 个，剩 ' + c + ' 个取平均' : '不去掉，' + P.n + ' 个分直接平均') + '；分数 ' + sc(P.min) + '–' + sc(P.max) + '，最小刻度 ' + sc(P.step) + '，平均分显示 ' + D + ' 位小数（四舍五入）。');
+    const diffRaw = P.rows.map((r, i) => i).filter((i) => rawRk[i] !== rk[i]);
+    if (k) facts.push(diffRaw.length ? '要是不去头去尾直接平均，' + diffRaw.length + ' 人名次不同：' + diffRaw.map((i) => nm(i) + ' 第 ' + rawRk[i] + ' → 第 ' + rk[i]).join('，') + '。' : '要是不去头去尾直接平均，名次一个都不变。');
+    const others = rules.filter((r) => r.k !== k).map((r) => ({ r, d: r.ranks.filter((q, i) => q !== rk[i]).length })).filter((x) => x.d);
+    facts.push(others.length ? '换别的去法，名次会变的有 ' + others.map((x) => '「' + x.r.name + '」（' + x.d + ' 人变，冠军 ' + x.r.champs.map(nm).join('、') + '）').join('、') + '。' : '换成别的去法（共 ' + (rules.length - 1) + ' 种），名次都一样。');
+    if (chase) facts.push(chase.best ? '第 2 名 ' + nm(chase.b) + ' 要超过 ' + nm(chase.a) + '，别的分都不动，最省的是评委 ' + (chase.best.j + 1) + ' 那一分从 ' + sc(P.rows[chase.b].v[chase.best.j]) + ' 打到 ' + sc(chase.best.x) + '（多 ' + sc(chase.best.d) + '）。' : '第 2 名 ' + nm(chase.b) + ' 要超过 ' + nm(chase.a) + '，只改任何一位评委的一个分（打到满分）都不够。');
+    facts.push('相邻名次一共 ' + cur.flip.pairs.length + ' 对，其中 ' + cur.flip.n + ' 对能被某一位评委一个人翻过来（给后一位打满分、前一位打最低分）' + (k && rules[0].flip.n !== cur.flip.n ? '；直接平均时是 ' + rules[0].flip.n + ' 对' : '') + '。');
+    if (showTies.length) facts.push('显示 ' + D + ' 位小数时，' + showTies.map((x) => nm(x.a) + ' 和 ' + nm(x.b) + ' 都显示 ' + show[x.a] + '，其实 ' + nm(x.a) + ' 留下的分加起来多 ' + sc(sums[x.a] - sums[x.b])).join('；') + '。');
+    const table = od.map((i) => ({ i, name: nm(i), rank: rk[i], v: P.rows[i].v, lo: tr[i].lo, hi: tr[i].hi, sum: sums[i], show: show[i], raw: showRaw[i], rawRank: rawRk[i] }));
+    return { P, st, stamp: STAMP[st], summary, facts, rules, table, ranks: rk, sums, show, chase, showTies, step1, champHit, champs };
+  }
+
+  function hitText(P, h, base) {
+    const nm = (i) => P.rows[i].name;
+    const moved = h.changed.map((i) => nm(i) + ' 第 ' + base[i] + '→' + h.rk[i]).join('，');
+    return '评委 ' + (h.j + 1) + ' 给 ' + nm(h.c) + (h.dlt > 0 ? ' 多打 ' : ' 少打 ') + sc(P.step) + '（' + sc(P.rows[h.c].v[h.j]) + '→' + sc(h.x) + '）：' + moved;
+  }
+  function stepText(R) {
+    const P = R.P, s = R.step1, L = [];
+    L.push('任何一个分改一格（±' + sc(P.step) + '）一共 ' + s.total + ' 种改法，其中 ' + s.hit.length + ' 种会让名次变' + (s.hit.length ? '，' + R.champHit.length + ' 种会动到冠军' : '') + '。');
+    const pick = R.champHit.slice(0, 3).concat(s.hit.filter((h) => R.champHit.indexOf(h) < 0).slice(0, Math.max(0, 4 - Math.min(3, R.champHit.length))));
+    pick.forEach((h) => L.push(hitText(P, h, s.base) + '。'));
+    return L;
+  }
+
+  function setScore(s, b, j, x) {
+    const o = JSON.parse(JSON.stringify(s));
+    const toks = splitScores(o.rows[b].scores); toks[j] = sc(x); o.rows[b].scores = toks.join(' ');
+    return o;
+  }
+  /* 建议：只改输入，代回后真的有对应效果 */
+  function suggestions(s, R) {
+    const out = [], P = R.P, nm = (i) => P.rows[i].name;
+    const others = R.rules.filter((r) => r.k !== P.k && r.ranks.some((q, i) => q !== R.ranks[i]));
+    others.sort((x, y) => Math.abs(x.k - P.k) - Math.abs(y.k - P.k) || x.k - y.k);
+    others.slice(0, 2).forEach((r) => {
+      const d = r.ranks.filter((q, i) => q !== R.ranks[i]).length;
+      out.push({ id: 'k' + r.k, text: '换成「' + r.name + '」：' + d + ' 人名次变，冠军是 ' + r.champs.map(nm).join('、') + '。', apply: Object.assign(JSON.parse(JSON.stringify(s)), { k: String(r.k) }) });
+    });
+    if (R.chase && R.chase.best) {
+      const b = R.chase.best;
+      out.push({ id: 'chase', text: '评委 ' + (b.j + 1) + ' 给 ' + nm(R.chase.b) + ' 的那一分从 ' + sc(P.rows[R.chase.b].v[b.j]) + ' 改成 ' + sc(b.x) + '，' + nm(R.chase.b) + ' 就排到 ' + nm(R.chase.a) + ' 前面。', apply: setScore(s, R.chase.b, b.j, b.x) });
+    }
+    if (R.showTies.length) {
+      const c = P.n - 2 * P.k;
+      for (let D = P.D + 1; D <= 4; D++) {
+        if (R.showTies.every((x) => rnd(R.sums[x.a], 100 * c, D) !== rnd(R.sums[x.b], 100 * c, D))) {
+          out.push({ id: 'D', text: '平均分显示 ' + D + ' 位小数，显示一样的 ' + R.showTies.length + ' 对就分得开了。', apply: Object.assign(JSON.parse(JSON.stringify(s)), { D: String(D) }) });
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  /* 导出 */
+  const csvCell = (v) => { const t = String(v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  function head(R) { const h = ['名次', '选手']; for (let j = 0; j < R.P.n; j++) h.push('评委' + (j + 1)); return h.concat(['去头去尾平均', '直接平均', '直接平均名次']); }
+  function cell(t, j) { const lo = t.lo.indexOf(j) >= 0, hi = t.hi.indexOf(j) >= 0; return sc(t.v[j]) + (lo ? '（去低）' : hi ? '（去高）' : ''); }
+  function rowsOut(R) { return R.table.map((t) => [t.rank, t.name].concat(t.v.map((x, j) => cell(t, j))).concat([t.show, t.raw, t.rawRank])); }
+  function ruleHead(R) { return ['选手'].concat(R.rules.map((r) => r.name + (r.k === R.P.k ? '（现在）' : ''))); }
+  function ruleRows(R) { return R.table.map((t) => [t.name].concat(R.rules.map((r) => '第 ' + r.ranks[t.i] + '（' + r.show[t.i] + '）'))).concat([['一位评委能翻过来的相邻名次'].concat(R.rules.map((r) => r.flip.n + ' / ' + r.flip.pairs.length))]); }
+  function toCSV(R, when) {
+    const L = [];
+    L.push(['去头去尾分', '生成 ' + when, '默认数据为虚构示例'].map(csvCell).join(','));
+    L.push(['比赛', R.P.label, '规则', ruleName(R.P.k, R.P.n), '分数范围', sc(R.P.min) + '–' + sc(R.P.max), '刻度', sc(R.P.step), '显示位数', R.P.D].map(csvCell).join(','));
+    L.push(['结论', R.stamp, R.summary].map(csvCell).join(','));
+    R.facts.forEach((f) => L.push(['', f].map(csvCell).join(',')));
+    L.push(head(R).map(csvCell).join(','));
+    rowsOut(R).forEach((r) => L.push(r.map(csvCell).join(',')));
+    L.push('');
+    L.push(ruleHead(R).map(csvCell).join(','));
+    ruleRows(R).forEach((r) => L.push(r.map(csvCell).join(',')));
+    return L.join('\n') + '\n';
+  }
+  function toMD(R, when, sg) {
+    const L = [], mdr = (r) => '| ' + r.map((x) => String(x).replace(/\|/g, '\\|')).join(' | ') + ' |';
+    L.push('# 去头去尾分' + (R.P.label ? ' · ' + R.P.label : ''), '', '生成时间：' + when + '　默认数据为虚构示例', '');
+    L.push('**' + R.stamp + '**：' + R.summary, '');
+    R.facts.forEach((f) => L.push('- ' + f));
+    L.push('', '## 评分表', '', mdr(head(R)), '|' + head(R).map(() => '---').join('|') + '|');
+    rowsOut(R).forEach((r) => L.push(mdr(r)));
+    L.push('', '## 换一种去法', '', mdr(ruleHead(R)), '|' + ruleHead(R).map(() => '---').join('|') + '|');
+    ruleRows(R).forEach((r) => L.push(mdr(r)));
+    L.push('', '## 差一格会怎样', '');
+    stepText(R).forEach((t) => L.push('- ' + t));
+    if (sg && sg.length) { L.push('', '## 可以改的', ''); sg.forEach((x) => L.push('- ' + x.text)); }
+    L.push('', '分数是你自己填的；按「去掉最高 k、最低 k，剩下取平均，四舍五入显示」来算，不内置任何比赛的真实规则。');
+    return L.join('\n') + '\n';
+  }
+
+  const DEFAULT = { label: '社区歌手赛决赛（虚构）', min: '0', max: '10', step: '0.1', k: '1', D: '1', rows: [
+    { name: '林小满', scores: '9.2 9.4 9.1 9.3 9.6 9.2 9.3' },
+    { name: '周可', scores: '9.0 9.3 9.9 9.1 9.2 9.0 9.7' },
+    { name: '陈默', scores: '9.4 9.2 9.3 8.1 9.4 9.1 9.1' },
+    { name: '许一帆', scores: '8.8 9.0 8.9 9.1 8.7 9.0 8.9' },
+    { name: '唐果', scores: '9.1 9.1 9.0 9.2 9.3 8.9 9.1' },
+    { name: '吴桐', scores: '8.6 8.9 9.5 8.7 8.8 8.6 8.7' },
+  ] };
+  const PRESETS = [
+    ['歌手赛决赛（默认）', DEFAULT],
+    ['百分制、5 位评委', { label: '年终述职评分', min: '60', max: '100', step: '1', k: '1', D: '1', rows: [
+      { name: '市场部', scores: '88 92 85 90 79' }, { name: '研发部', scores: '91 86 89 95 87' }, { name: '客服部', scores: '84 90 88 87 89' }, { name: '财务部', scores: '90 83 86 88 98' }] }],
+    ['跳水式：去 2 高 2 低', { label: '少儿组跳水（虚构）', min: '0', max: '10', step: '0.5', k: '2', D: '2', rows: [
+      { name: '小舟', scores: '7.5 8 7.5 8.5 7 8 7.5' }, { name: '阿禾', scores: '8 7.5 8 7 8 9.5 7.5' }, { name: '豆豆', scores: '7 7.5 8 8 7.5 7.5 8' }] }],
+  ];
+
+  const API = { KEYS, MAX_ROWS, MIN_ROWS, MAX_J, MIN_J, DEFAULT, PRESETS, InputError, parse, trim, tsum, ranksOf, order, ruleName, raiseTo, bestRaise, judgeCanFlip, flipPower, oneStep, calculate, suggestions, stepText, setScore, splitScores, head, rowsOut, ruleHead, ruleRows, toCSV, toMD, sc, rnd, fmtInt };
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.AppCore = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+  </script>
+  <script>
+/* 去头去尾分 · 界面层 */
+(function () {
+  'use strict';
+  const C = window.AppCore;
+  const KEY = 'trimmed-score:v1';
+  const NAME = '去头去尾分';
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  const { DEFAULT, PRESETS, KEYS, sc } = C;
+  const INPUTS = ['label', 'min', 'max', 'step', 'D', 'k'];
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const FF = '"PingFang SC","Microsoft YaHei",sans-serif';
+  const COL = { tie: '#b3362b', fragile: '#b7791f', ok: '#2c7a4b', main: '#2d5b8a', grid: '#e3e8ee', txt: '#6a7480', ink: '#1f2630' };
+  let state = copy(DEFAULT);
+  let last = null;
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式忽略 */ } }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      const s = {};
+      for (const k of KEYS) {
+        if (k === 'rows') continue;
+        if (o[k] != null && typeof o[k] === 'object') return null;
+        s[k] = o[k] == null ? '' : String(o[k]).slice(0, 40);
+      }
+      if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > C.MAX_ROWS) return null;
+      s.rows = [];
+      for (const r of o.rows) {
+        if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+        const x = {};
+        for (const f of ['name', 'scores']) { if (r[f] != null && typeof r[f] === 'object') return null; x[f] = r[f] == null ? '' : String(r[f]).slice(0, 200); }
+        s.rows.push(x);
+      }
+      return s;
+    } catch (e) { return null; }
+  }
+
+  function rowInputs() {
+    $('rows').innerHTML = state.rows.map((r, i) => '<div class="rrow">' +
+      '<input id="row-' + i + '-name" data-i="' + i + '" data-f="name" maxlength="20" aria-label="第 ' + (i + 1) + ' 位选手名字" value="' + esc(r.name) + '">' +
+      '<input id="row-' + i + '-scores" data-i="' + i + '" data-f="scores" maxlength="200" inputmode="decimal" aria-label="第 ' + (i + 1) + ' 位选手的分" value="' + esc(r.scores) + '">' +
+      '<button class="ghost" data-del="' + i + '"' + (state.rows.length <= C.MIN_ROWS ? ' disabled' : '') + ' aria-label="删掉第 ' + (i + 1) + ' 位">删</button></div>').join('');
+    $('addRow').disabled = state.rows.length >= C.MAX_ROWS;
+  }
+  function fill() { INPUTS.forEach((k) => { $(k).value = state[k]; }); rowInputs(); }
+
+  function bigText(R) {
+    if (R.st === 'tie') return '<b>' + R.champs.length + ' 人</b> 并列第一，都是 <b>' + esc(R.show[R.champs[0]]) + '</b> 分';
+    return '第一 <b>' + esc(R.P.rows[R.champs[0]].name) + '</b> · <b>' + esc(R.show[R.champs[0]]) + '</b> 分';
+  }
+  const plain = (h) => h.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+
+  function sheetHTML(R) {
+    const n = R.P.n;
+    let h = '<tr><th>名次</th><th style="text-align:left">选手</th>';
+    for (let j = 0; j < n; j++) h += '<th>评委' + (j + 1) + '</th>';
+    h += '<th>去头去尾平均</th><th>直接平均</th></tr>';
+    for (const t of R.table) {
+      h += '<tr' + (t.rank === 1 ? ' class="top"' : '') + '><td class="rk">' + t.rank + '</td><td class="nm" title="' + esc(t.name) + '">' + esc(t.name) + '</td>';
+      for (let j = 0; j < n; j++) { const cut = t.lo.indexOf(j) >= 0 || t.hi.indexOf(j) >= 0; h += '<td' + (cut ? ' class="cut"' : '') + '>' + sc(t.v[j]) + '</td>'; }
+      h += '<td class="avg">' + esc(t.show) + '</td><td class="raw">' + esc(t.raw) + '（第 ' + t.rawRank + '）</td></tr>';
+    }
+    return h;
+  }
+  function rulesHTML(R) {
+    const k = R.P.k;
+    let h = '<tr><th style="text-align:left">选手</th>' + R.rules.map((r) => '<th' + (r.k === k ? ' class="now"' : '') + '>' + esc(r.name) + (r.k === k ? '（现在）' : '') + '</th>').join('') + '</tr>';
+    for (const t of R.table) {
+      h += '<tr><td class="nm">' + esc(t.name) + '</td>' + R.rules.map((r) => '<td class="' + (r.k === k ? 'now' : r.ranks[t.i] !== t.rank ? 'chg' : '') + '">第 ' + r.ranks[t.i] + '（' + esc(r.show[t.i]) + '）</td>').join('') + '</tr>';
+    }
+    h += '<tr><td class="nm">一位评委能翻</td>' + R.rules.map((r) => '<td' + (r.k === k ? ' class="now"' : '') + '>' + r.flip.n + ' / ' + r.flip.pairs.length + ' 对</td>').join('') + '</tr>';
+    return h;
+  }
+
+  /* 名次梯：横轴是留下的分的平均（精确值），每人一个点；刻度范围按数据自动取 */
+  function drawLadder(g, R, W, H, fs) {
+    const P = R.P, c = P.n - 2 * P.k, av = R.sums.map((x) => x / c / 100);
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    let lo = Math.min(...av), hi = Math.max(...av);
+    const stepv = P.step / 100;
+    if (hi - lo < stepv * 2) { const m = (hi + lo) / 2; lo = m - stepv; hi = m + stepv; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    g.font = fs + 'px ' + FF;
+    const nameW = Math.min(W * 0.32, Math.max(...P.rows.map((r) => g.measureText(r.name).width)) + 12);
+    const x0 = nameW + 4, x1 = W - 14, top = 6, bot = H - fs - 14;
+    const xv = (v) => x0 + (x1 - x0) * (v - lo) / (hi - lo);
+    /* 刻度：取「好看的」间隔 */
+    const span = hi - lo, raw = span / 5, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const tick = [1, 2, 5, 10].map((m) => m * mag).find((t) => t >= raw) || raw;
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    for (let v = Math.ceil(lo / tick) * tick; v <= hi + 1e-9; v += tick) {
+      const x = xv(v); g.strokeStyle = COL.grid; g.lineWidth = 1; g.beginPath(); g.moveTo(x, top); g.lineTo(x, bot); g.stroke();
+      const t = String(Math.round(v / tick) * tick >= 0 ? +(Math.round(v / tick) * tick).toFixed(6) : v);
+      g.fillStyle = COL.txt; g.fillText(t, Math.max(x0 + 8, Math.min(x1 - 8, x)), bot + 4);
+    }
+    const nR = R.table.length, rowH = (bot - top) / nR;
+    R.table.forEach((t, r) => {
+      const y = top + rowH * (r + 0.5), x = xv(av[t.i]);
+      g.fillStyle = COL.ink; g.textAlign = 'right'; g.textBaseline = 'middle'; g.font = (t.rank === 1 ? 'bold ' : '') + fs + 'px ' + FF;
+      g.fillText(fitText(g, t.name, nameW - 8), nameW - 4, y);
+      g.strokeStyle = COL.grid; g.beginPath(); g.moveTo(x0, y); g.lineTo(x, y); g.stroke();
+      g.fillStyle = t.rank === 1 ? COL[R.st] : COL.main; g.beginPath(); g.arc(x, y, Math.max(4, Math.min(7, rowH * 0.3)), 0, 7); g.fill();
+      g.font = fs + 'px ' + FF; g.textBaseline = 'middle';
+      const lab = t.show + '（第 ' + t.rank + '）', tw = g.measureText(lab).width;
+      let tx = x + 10; g.textAlign = 'left';
+      if (tx + tw > x1 + 12) { tx = x - 10 - tw; }
+      g.fillStyle = t.rank === 1 ? COL[R.st] : COL.txt; g.fillText(lab, tx, y);
+    });
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  }
+  function fitText(g, t, w) { let s = String(t); if (g.measureText(s).width <= w) return s; while (s.length > 1 && g.measureText(s + '…').width > w) s = s.slice(0, -1); return s + '…'; }
+  function renderCanvas(R) {
+    const cv = $('ladder'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth;
+    const H = Math.max(W < 500 ? 170 : 200, R.table.length * (W < 500 ? 26 : 30) + 40);
+    cv.style.height = H + 'px';
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawLadder(g, R, W, H, W < 500 ? 11 : 12);
+  }
+  function sugList(sg) {
+    $('sugCard').style.display = sg.length ? '' : 'none';
+    $('sugs').innerHTML = sg.map((s, k) => '<div class="sug"><span>' + esc(s.text) + '</span><button class="ghost" data-sug="' + s.id + '" data-k="' + k + '">代回</button></div>').join('');
+    [].forEach.call($('sugs').querySelectorAll('button'), (b) => b.addEventListener('click', () => { state = copy(sg[+b.dataset.k].apply); fill(); run(); }));
+  }
+
+  function run() {
+    document.querySelectorAll('.bad').forEach((el) => el.classList.remove('bad'));
+    $('error').style.display = 'none';
+    try {
+      const R = C.calculate(state);
+      const sg = C.suggestions(state, R);
+      $('out').style.display = '';
+      $('stamp').textContent = R.stamp; $('stamp').className = 'stamp ' + R.st;
+      $('big').innerHTML = bigText(R);
+      $('sumTxt').textContent = R.summary;
+      $('facts').innerHTML = R.facts.map((f) => '<li>' + esc(f) + '</li>').join('');
+      $('sheet').innerHTML = sheetHTML(R);
+      $('rules').innerHTML = rulesHTML(R);
+      $('stepList').innerHTML = C.stepText(R).map((t) => '<li>' + esc(t) + '</li>').join('');
+      last = { r: R, sg };
+      renderCanvas(R); sugList(sg);
+    } catch (e) {
+      last = null;
+      if (e.field) { const el = $(e.field === 'rows' ? 'rows' : e.field); if (el) el.classList.add('bad'); }
+      $('error').textContent = '算不了：' + e.message; $('error').style.display = 'block';
+      $('out').style.display = 'none';
+    }
+    save();
+  }
+
+  /* ── 导出 ── */
+  function stamp() { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+  function wrap(g, t, w) {
+    const NOHEAD = '，。、；：！？）」』”%·→｜/';
+    const out = []; let line = [];
+    const toks = String(t).match(/[0-9][0-9.,]*|[A-Za-z_][A-Za-z0-9_.\-]*|[\s\S]/g) || [];
+    const width = (a) => g.measureText(a.join('')).width;
+    for (const tk of toks) {
+      if (line.length && width(line.concat([tk])) > w) {
+        const carry = [tk];
+        while (line.length > 1 && (NOHEAD.indexOf(carry[0][0]) >= 0 || '（「『“'.indexOf(line[line.length - 1]) >= 0)) carry.unshift(line.pop());
+        out.push(line.join(''));
+        line = carry; if (/^\s+$/.test(line[0])) line.shift();
+      } else line.push(tk);
+    }
+    if (line.length) out.push(line.join('')); return out;
+  }
+  function drawPNG(Lx) {
+    const R = Lx.r, P = R.P;
+    const Wd = 1080, H = 1350, X = 64, TW = 952;
+    const cv = document.createElement('canvas'); cv.width = Wd; cv.height = H;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#eef1f4'; g.fillRect(0, 0, Wd, H);
+    g.fillStyle = '#ffffff'; g.fillRect(32, 32, Wd - 64, H - 64);
+    g.fillStyle = COL.txt; g.font = '22px ' + FF;
+    g.fillText(fitText(g, NAME + (P.label ? ' · ' + P.label : '') + ' · ' + C.ruleName(P.k, P.n), TW - 300), X, 88);
+    g.save(); g.translate(X + TW - 130, 76); g.rotate(-0.05);
+    g.strokeStyle = g.fillStyle = COL[R.st]; g.lineWidth = 4; g.font = 'bold 28px ' + FF;
+    const sw = Math.max(150, g.measureText(R.stamp).width + 36);
+    g.strokeRect(-sw / 2, -28, sw, 50); g.textAlign = 'center'; g.fillText(R.stamp, 0, 8); g.restore();
+    g.fillStyle = COL.ink;
+    let bf = 46; g.font = 'bold ' + bf + 'px ' + FF;
+    while (bf > 26 && g.measureText(plain(bigText(R))).width > TW) { bf -= 2; g.font = 'bold ' + bf + 'px ' + FF; }
+    g.fillText(fitText(g, plain(bigText(R)), TW), X, 160);
+    let y = 210;
+    g.font = '25px ' + FF;
+    wrap(g, R.summary, TW).slice(0, 4).forEach((l) => { g.fillText(l, X, y); y += 36; });
+    y += 6;
+    const lh = Math.min(420, Math.max(220, R.table.length * 40 + 50));
+    g.save(); g.translate(X, y); drawLadder(g, R, TW, lh, 20); g.restore(); y += lh + 24;
+    g.font = '21px ' + FF; g.fillStyle = COL.ink;
+    for (const f of R.facts.slice(1)) { const ls = wrap(g, '· ' + f, TW); if (y + ls.length * 30 > H - 130) break; ls.forEach((l) => { g.fillText(l, X, y); y += 30; }); y += 3; }
+    y += 6;
+    g.fillStyle = COL.main; g.font = 'bold 21px ' + FF; if (y + 60 < H - 130) { g.fillText('差一格会怎样', X, y + 4); y += 36; }
+    g.font = '21px ' + FF; g.fillStyle = COL.ink;
+    for (const t of C.stepText(R).slice(0, 3)) { const ls = wrap(g, '· ' + t, TW); if (y + ls.length * 30 > H - 110) break; ls.forEach((l) => { g.fillText(l, X, y); y += 30; }); y += 3; }
+    y += 8;
+    if (Lx.sg.length && y + 70 < H - 110) { g.fillStyle = COL.main; g.font = 'bold 21px ' + FF; g.fillText('可以试的', X, y + 4); y += 36; g.font = '21px ' + FF; g.fillStyle = COL.ink; }
+    for (const sg of Lx.sg) { const ls = wrap(g, '· ' + sg.text, TW); if (y + ls.length * 30 > H - 110) break; ls.forEach((l) => { g.fillText(l, X, y); y += 30; }); y += 3; }
+    g.fillStyle = COL.txt; g.font = '18px ' + FF;
+    ['按「去掉最高 k、最低 k，剩下取平均」算，名次比留下的分之和；分数是你自己填的。', '默认数据为虚构示例。'].forEach((l, i) => g.fillText(fitText(g, l, TW), X, H - 74 + i * 27));
+    return Promise.resolve(cv);
+  }
+  function backup() {
+    const R = last.r, P = R.P;
+    return { app: NAME, version: 1, savedAt: stamp(), input: copy(state), result: { status: R.st, stamp: R.stamp, summary: R.summary, rule: C.ruleName(P.k, P.n), judges: P.n, dropEachSide: P.k,
+      champions: R.champs.map((i) => P.rows[i].name),
+      table: R.table.map((t) => ({ rank: t.rank, name: t.name, scores: t.v.map(sc), droppedLow: t.lo.map((j) => j + 1), droppedHigh: t.hi.map((j) => j + 1), keptSum: sc(t.sum), shown: t.show, plainAverage: t.raw, plainRank: t.rawRank })),
+      rules: R.rules.map((r) => ({ k: r.k, name: r.name, ranks: r.ranks, shown: r.show, champions: r.champs.map((i) => P.rows[i].name), oneJudgeFlippable: r.flip.n, adjacentPairs: r.flip.pairs.length })),
+      oneStep: { total: R.step1.total, rankChanged: R.step1.hit.length, championChanged: R.champHit.length },
+      chase: R.chase ? { leader: P.rows[R.chase.a].name, second: P.rows[R.chase.b].name, gap: sc(R.chase.gap), cheapest: R.chase.best ? { judge: R.chase.best.j + 1, from: sc(P.rows[R.chase.b].v[R.chase.best.j]), to: sc(R.chase.best.x) } : null } : null,
+      shownTies: R.showTies.map((x) => [P.rows[x.a].name, P.rows[x.b].name]) } };
+  }
+
+  function init() {
+    let dt = null;
+    const later = () => { save(); clearTimeout(dt); dt = setTimeout(run, 200); };
+    INPUTS.forEach((k) => { $(k).addEventListener('input', () => { state[k] = $(k).value; later(); }); });
+    $('rows').addEventListener('input', (e) => { const t = e.target; if (t.dataset.i == null) return; state.rows[+t.dataset.i][t.dataset.f] = t.value; later(); });
+    $('rows').addEventListener('click', (e) => { const b = e.target.closest('button[data-del]'); if (!b || state.rows.length <= C.MIN_ROWS) return; state.rows.splice(+b.dataset.del, 1); rowInputs(); run(); });
+    $('addRow').addEventListener('click', () => {
+      if (state.rows.length >= C.MAX_ROWS) return;
+      const n = C.splitScores((state.rows[0] || {}).scores).length || 5;
+      let i = state.rows.length + 1; const names = state.rows.map((r) => String(r.name).trim());
+      while (names.indexOf('选手 ' + i) >= 0) i++;
+      const mid = (() => { try { const P = C.parse(state); return sc(P.min + Math.round((P.max - P.min) / P.step * 0.8) * P.step); } catch (e) { return ''; } })();
+      state.rows.push({ name: '选手 ' + i, scores: mid ? Array(n).fill(mid).join(' ') : '' }); rowInputs(); run();
+    });
+    PRESETS.forEach((p) => {
+      const b = document.createElement('button'); b.className = 'ghost'; b.textContent = p[0];
+      b.addEventListener('click', () => { state = copy(p[1]); fill(); run(); });
+      $('presets').appendChild(b);
+    });
+    $('reset').addEventListener('click', () => { state = copy(DEFAULT); fill(); run(); });
+    $('dlCSV').addEventListener('click', () => { if (last) download(NAME + '.csv', new Blob(['\ufeff' + C.toCSV(last.r, stamp())], { type: 'text/csv;charset=utf-8' })); });
+    $('dlMD').addEventListener('click', () => { if (last) download(NAME + '.md', new Blob([C.toMD(last.r, stamp(), last.sg)], { type: 'text/markdown;charset=utf-8' })); });
+    $('dlJSON').addEventListener('click', () => { if (last) download(NAME + '-备份.json', new Blob([JSON.stringify(backup(), null, 2)], { type: 'application/json' })); });
+    $('dlPNG').addEventListener('click', () => { if (last) drawPNG(last).then((cv2) => cv2.toBlob((b) => download(NAME + '-1080x1350.png', b), 'image/png')); });
+    let rt = null; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (last) renderCanvas(last.r); }, 150); });
+    state = load() || copy(DEFAULT);
+    fill(); run();
+    window.__ex = { last: () => last, state: () => state, presets: PRESETS, DEFAULT, drawPNG, backup, bigPlain: () => plain(bigText(last.r)) };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+  </script>
+</body>
+</html>
